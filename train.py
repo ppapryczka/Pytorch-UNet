@@ -28,9 +28,15 @@ def train_net(net,
               lr=0.001,
               val_percent=0.1,
               save_cp=True,
-              img_scale=0.5):
+              img_scale=0.5,
+              images_ids = None
+              ):
 
-    dataset = BasicDataset(dir_img, dir_mask, img_scale)
+    if images_ids is None:
+        dataset = BasicDataset(dir_img, dir_mask, img_scale)
+    else:
+        dataset = BasicDataset(dir_img, dir_mask, img_scale, images_ids)
+
     n_val = int(len(dataset) * val_percent)
     n_train = len(dataset) - n_val
     train, val = random_split(dataset, [n_train, n_val])
@@ -51,8 +57,9 @@ def train_net(net,
         Images scaling:  {img_scale}
     ''')
 
-    optimizer = optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-8, momentum=0.9)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.n_classes > 1 else 'max', patience=2)
+    optimizer = optim.AdamW(net.parameters(), weight_decay=1e-4)
+    # optimizer = optim.RMSprop(net.parameters(), lr=lr, weight_decay=1e-8, momentum=0.9)
+    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min' if net.n_classes > 1 else 'max', patience=2)
     if net.n_classes > 1:
         criterion = nn.CrossEntropyLoss()
     else:
@@ -95,7 +102,7 @@ def train_net(net,
                         writer.add_histogram('weights/' + tag, value.data.cpu().numpy(), global_step)
                         writer.add_histogram('grads/' + tag, value.grad.data.cpu().numpy(), global_step)
                     val_score = eval_net(net, val_loader, device)
-                    scheduler.step(val_score)
+                    # scheduler.step(val_score)
                     writer.add_scalar('learning_rate', optimizer.param_groups[0]['lr'], global_step)
 
                     if net.n_classes > 1:
@@ -121,7 +128,7 @@ def train_net(net,
             logging.info(f'Checkpoint {epoch + 1} saved !')
 
     writer.close()
-
+    return net
 
 def get_args():
     parser = argparse.ArgumentParser(description='Train the UNet on images and target masks',
